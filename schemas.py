@@ -1,48 +1,95 @@
 """
-Database Schemas
+Database Schemas for Influencer Marketplace
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
+Each Pydantic model corresponds to a MongoDB collection (lowercased class name).
 
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Collections:
+- User: Auth users with roles (influencer, business, admin)
+- InfluencerProfile: Public profile of influencers
+- BusinessProfile: Business details for brand/users
+- Booking: Booking requests between business and influencer
+- Message: Chat messages between business and influencer
+- Visit: Profile visit tracking for influencers
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List, Literal, Dict
 
-# Example schemas (replace with your own):
+RoleType = Literal["influencer", "business", "admin"]
+PlatformType = Literal["instagram", "facebook", "youtube"]
+
+class SocialLinks(BaseModel):
+    instagram: Optional[str] = Field(None, description="Instagram profile URL")
+    facebook: Optional[str] = Field(None, description="Facebook profile URL")
+    youtube: Optional[str] = Field(None, description="YouTube channel URL")
+
+class PlatformMetrics(BaseModel):
+    followers: Optional[int] = Field(0, ge=0)
+    avg_likes: Optional[int] = Field(0, ge=0)
+    avg_comments: Optional[int] = Field(0, ge=0)
+    engagement_rate: Optional[float] = Field(0.0, ge=0.0)
+
+class Metrics(BaseModel):
+    instagram: Optional[PlatformMetrics] = PlatformMetrics()
+    facebook: Optional[PlatformMetrics] = PlatformMetrics()
+    youtube: Optional[PlatformMetrics] = PlatformMetrics()
 
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    email: EmailStr
+    password_hash: str
+    name: str
+    role: RoleType = "business"
+    token: Optional[str] = None
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class InfluencerProfile(BaseModel):
+    user_id: str
+    display_name: str
+    budget_min: int = Field(0, ge=0)
+    budget_max: int = Field(0, ge=0)
+    city: str
+    location: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    categories: List[str] = []
+    social_links: Optional[SocialLinks] = SocialLinks()
+    metrics: Optional[Metrics] = Metrics()
+    bio: Optional[str] = None
+    visits: int = 0
 
-# Add your own schemas here:
-# --------------------------------------------------
+class BusinessProfile(BaseModel):
+    user_id: str
+    business_name: str
+    city: Optional[str] = None
+    industry: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    description: Optional[str] = None
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Booking(BaseModel):
+    influencer_id: str
+    business_id: str
+    status: Literal["pending", "accepted", "rejected", "completed"] = "pending"
+    campaign_brief: Optional[str] = None
+    budget_offer: Optional[int] = None
+    notes: Optional[str] = None
+
+class Message(BaseModel):
+    conversation_id: str  # business_id:influencer_id
+    sender_id: str
+    receiver_id: str
+    text: str
+
+class Visit(BaseModel):
+    influencer_id: str
+    viewer_id: Optional[str] = None
+
+# Response helpers
+class PublicInfluencer(BaseModel):
+    id: str
+    display_name: str
+    city: str
+    categories: List[str]
+    budget_min: int
+    budget_max: int
+    metrics_summary: Dict[str, int] = {}
+    avatar_url: Optional[str] = None
